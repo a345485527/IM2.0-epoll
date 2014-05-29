@@ -99,7 +99,8 @@ void acceptClient()
                 while((sockfd=accept(listenfd,(struct sockaddr*) &cliaddr, &len))>0)
                 {
                     setnonblock(sockfd);
-                    cout<<"connect from "<<inet_ntop(AF_INET,&cliaddr.sin_addr,buff,sizeof(buff))
+                    cout<<"connect from "<<inet_ntop(AF_INET,&cliaddr.sin_addr,buff,
+                            sizeof(buff ))
                         <<"port is "<<ntohs(cliaddr.sin_port)<<"\n";
 
                      //if the size of onlineVec full,realloc it and init new space
@@ -147,7 +148,11 @@ void acceptClient()
                     // connection closed by client,
                     else if(n==0)
                     {
-                    //  logoutHelp(sockfd);
+                        /*
+                         * close the descriptor will make epoll
+                         * remove it from the set of the descriptors
+                         * which monitored
+                         */
                         close(fd);
                         break;
                     }
@@ -183,6 +188,7 @@ void * listenCmd(void* arg)
             free(onlineVec.pOnlineClient);
             pool_destroy();
             close(sockfd);
+            close(epfd);
             // all threads will be exit,close their own socked auto
             exit(0);
         }

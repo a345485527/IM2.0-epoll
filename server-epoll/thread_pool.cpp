@@ -22,10 +22,20 @@ void pool_init(int _max_thread_num)
 
 void pool_add_work(void(*p)(p_base*,int),p_base* _ptr,int _sockfd)
 {
-    cout<<"add work\n";
     CThread_worker *work=(CThread_worker*)malloc(sizeof(CThread_worker));
     work->process=p;
-    work->ptr=_ptr;
+
+    /*
+     *  copy message which from epoll to workqueue,
+     *  because message buffer in epoll may be covered
+     *  cause by stack memory or consecutive message from 
+     *  client!
+     *  don't forget to free it
+     */
+    p_base *mes_ptr=(p_base*)malloc(MAX_PACKET_LEN);
+    memcpy(mes_ptr, _ptr, MAX_PACKET_LEN);
+    work->ptr=mes_ptr;
+
     work->sockfd=_sockfd;
     work->next=NULL;
     pthread_mutex_lock(&pool->queue_mutex);
@@ -95,8 +105,8 @@ void *thread_routine(void * arg)
         // the condition is true,not false,fuck here
         if(pool->isDestroy==true)
         {
-            pthread_mutex_destroy(&pool->queue_mutex);
-            return ((void*)0);
+            pthread_mutex_unlock(&pool->queue_mutex);
+            pthread_exit(NULL);
         }
         cout<<"read workqueue\n";
         CThread_worker* handle_work=pool->queue_head;
@@ -106,7 +116,8 @@ void *thread_routine(void * arg)
         
         // protocol_handle function
         handle_work->process(handle_work->ptr,handle_work->sockfd);
+        free(handle_work->ptr);
         free(handle_work);
     }
-    return ((void*)0);
+    pthread_exit(NULL);
 }
